@@ -1,0 +1,260 @@
+
+
+
+source "Z:/4-MAYA/scripts/publish/autoBuildRefScene.mel";
+source "Z:/4-MAYA/scripts/publish/autoSmooth.mel";
+source "Z:/4-MAYA/scripts/publish/renameToolKit.mel";
+source "Z:/4-MAYA/scripts/publish/createShaderSet.mel";
+source "Z:/4-MAYA/scripts/publish/removeAllShadingNodes.mel";
+
+
+
+
+global proc int writeFile(string $pathFile, string $text){
+
+    $fileId = `fopen $pathFile "w"`;
+    fwrite $fileId $text;
+    fclose $fileId;
+    return 1;
+}
+
+
+global proc mobiPipe(){
+
+    if(`window -exists mobiPipeUI`){
+        deleteUI mobiPipeUI;
+    }
+
+    window -t "mobiPipe" -menuBar true mobiPipeUI;
+        menu -label "File" -tearOff true;
+            menuItem -label "New";
+            menuItem -label "Open";
+            menuItem -label "Save";
+            menuItem -divider true;
+            menuItem -label "Quit";
+
+    columnLayout -w 380  mainCL ;
+        tabLayout -innerMarginWidth 5 -innerMarginHeight 5 mainTL;
+            columnLayout -co "right" 10 -adj 1 pipelineCL;
+                separator -height 20 -style "out";
+                text "Project Manager";
+                separator -height 20 -style "in";
+                frameLayout -cll 1 -li 10 -mw 20 -label "infos Workspace" infosWorkspaceFL;
+                  columnLayout -adj 1 ;
+                    rowLayout -adj 1 -nc 3 infosWorkspaceRL;
+                        text -l "SetProject : ";
+                        textField -tx `workspace -q -rd` -ed 0  -w 200 setProjectTF;
+                        button -w 70 -l"set Project" -c "string $pathDialog[] = `fileDialog2 -fileMode 3 -caption \"setProjectProc\"`;if (1 == `size($pathDialog)`){setProjectProc($pathDialog[0]);};textField -e -tx $pathDialog[0] setProjectTF ";
+                        setParent..;
+                    rowLayout -adj 1  -nc 3 infoUserRL;
+                        text -l "user : ";
+                        textField -tx `getUsercfg` -ed 0 -w 200 userTF;
+                        button -w 70 -l "set User" -c "setUsercfg `textField -q -tx userTF`;textField -e -tx `getUsercfg` -ed 0 -w 140 userTF";
+                    setParent..;
+                   setParent..;
+                 setParent..;
+                 frameLayout -cll 1 -li 10 -mw 20 -label "Open/Save Assets" openSaveFL;
+                 //button "Switch Mode";
+                 radioCollection AssetsPlansRC;
+                 radioCollection RefsWorksRC;
+                 radioCollection  SetsPropsCharRC;
+                 rowColumnLayout -nc 3 ;
+                     radioButton -sl -label "0-ASSETS" -cl "AssetsPlansRC" -onc "navigationProcRB" AssetChoiceRB;
+                     radioButton -label "1-PLANS" -cl "AssetsPlansRC" -onc  "navigationProcRB" PlanChoiceRB;
+                     text -l"";
+                     radioButton -sl -label "0-REFS" -cl "RefsWorksRC" -onc  "navigationProcRB" RefsChoiceRB;
+                     radioButton -label "1-WORKS" -cl "RefsWorksRC" -onc  "navigationProcRB" WorksChoiceRB;
+                     text -l"";
+                     radioButton -sl -label "0-SETS" -cl "SetsPropsCharRC" -onc  "navigationProcRB" SetsRB;
+                     radioButton -label "1-PROPS" -cl "SetsPropsCharRC" -onc  "navigationProcRB" PropsRB;
+                     radioButton -label "2-CHARACTERS" -cl "SetsPropsCharRC" -onc  "navigationProcRB" CharacterRB;
+                 setParent ..;
+                    rowLayout -nc 3 ;
+                    optionMenu -changeCommand "print #1" typeFileOM ;
+                        menuItem -label "MD";
+                        menuItem -label "TX";
+                        menuItem -label "ST";
+                        menuItem -label "LY";
+                        menuItem -label "AN";
+                        menuItem -label "RD";
+                        menuItem -label "FX";
+                    columnLayout nameFileCL ;
+                      optionMenu -w 210  nameFileOM ;
+                    setParent ..;
+
+            optionMenu -changeCommand "print #1" versionFileOM;
+                menuItem -label "001";
+                menuItem -label "002";
+                menuItem -label "003";
+              setParent..;
+
+                rowLayout -adj 1 -cw 50 50 -nc 3 ;
+                  button -w 50 -l "OPEN" -c "openAsset `textField -q -tx pathFolderTF` `optionMenu -q -v typeFileOM` `optionMenu -q -v nameFileOM` \"001\"";
+                  button -w 50 -l "SAVE";
+                  button -w 50 -l "PUBLISH";
+                setParent..;
+                textField -tx "" -ed 0  pathFolderTF;
+            setParent..;
+
+         setParent..;
+
+         columnLayout -adj 1 ModelingToolsCL;
+           separator -height 20 -style "out";
+
+           renamerToolKitUI;
+
+           autoBuildRefSceneUI;
+
+         columnLayout -adj 1 renderingCL;
+             autoSmoothUI;
+             separator;
+             createCustomSetUI;
+         setParent..;
+
+     tabLayout -edit
+         -tabLabel pipelineCL "PipeLine" -tabLabel renderingCL "Rendering"  -tabLabel ModelingToolsCL "Modeling"
+         mainTL;
+    if(`textField -q -tx userTF` == "No User Set"){
+          textField -e -ed 1 userTF;
+    }
+
+    window -e -w 400 -s 0 mobiPipeUI;
+    showWindow mobiPipeUI;
+
+    string $updateListPathFolder[] = `genTargetPath` ;
+    updateNamesMenuItems $updateListPathFolder;
+}
+
+global proc navigationProcRB(){
+   string $updateListPathFolder[] = `genTargetPath` ;
+   updateNamesMenuItems $updateListPathFolder;
+   string $path = `textField -q -tx pathFolderTF`;
+   string $name = `optionMenu -q -v nameFileOM`;
+   string $type = `optionMenu -q -v typeFileOM`;
+   string $versionFile[] = `versionFileProc $path $name $type`;
+   print $versionFile;
+}
+
+global proc int setProjectProc( string $pathProject )
+{
+    setProject $pathProject ;
+    print $pathProject;
+    return 1;
+}
+global proc string getUsercfg(){
+  string $pathfilecfg = (`internalVar -utd`+"mobiUser.cfg");
+    if(`file -q -ex $pathfilecfg `){
+      string $mobiUser = freadAllText (`internalVar -utd`+"mobiUser.cfg");
+      return $mobiUser;
+    } else{
+      return "No User Set";
+    }
+}
+
+global proc setUsercfg(string $nameUser){
+
+  writeFile (`internalVar -utd`+"mobiUser.cfg")  $nameUser;
+
+}
+
+global proc string[] genTargetPath(){
+
+  string $selAssetsPlansRC = `radioCollection -q -sl AssetsPlansRC`;
+  string $AssetPlanChoice  = `radioButton -q -l $selAssetsPlansRC`;
+
+  string $selRefsWorksRC  = `radioCollection -q -sl RefsWorksRC`;
+  string $RefsWorksChoice = `radioButton -q -l $selRefsWorksRC`;
+
+  string $selSetsPropsCharRC  = `radioCollection -q -sl SetsPropsCharRC`;
+  string $SetsPropsCharChoice = `radioButton -q -l $selSetsPropsCharRC`;
+
+  string $targetPath = ((`workspace -q -rd`)+(`workspace -q -fre "scene"`))+ "/" + $AssetPlanChoice + "/" + $RefsWorksChoice +"/" + $SetsPropsCharChoice+"/";
+  textField -e -tx $targetPath pathFolderTF;
+
+  string $listFileTargeted[] = `getFileList -folder $targetPath`;
+
+  $deleteItem = `optionMenu -q -ils nameFileOM ` ;
+  if(size($deleteItem) !=0 ){deleteUI -mi $deleteItem;}
+
+  $listFileTargeted = sort($listFileTargeted);
+
+  return $listFileTargeted;
+
+}
+
+global proc string[] versionFileProc(string $pathfolder , string $name , string $typeAsset){
+
+    string $version[] ={};
+
+    string $listFileTargeted[] = `getFileList -folder ($pathfolder+"/"+$name)`;
+
+    //print $listFileTargeted;
+    int $i=0;
+    for($each in $listFileTargeted){
+      $each = basenameEx($each);
+            //print $each;
+      string $buffer[] = {};
+      int $nbToken = `tokenize $each "_" $buffer`;
+      string $test =  `match $typeAsset $buffer[0]`;
+
+      if(`match $typeAsset $buffer[0]` == $typeAsset){
+
+        if(`match "ref" $buffer[(size($buffer)-1)]` == "ref"){
+          $version[$i] = $buffer[(size($buffer)-2)];
+          $i++;
+          }else{
+          $version[$i] = $buffer[(size($buffer)-1)];
+          $i++;
+          }
+      }
+    }
+    //print $version;
+    return $version ;
+
+}
+
+global proc updateNamesMenuItems(string $listFileTargeted[]){
+
+    int $i=0;
+    for($each in $listFileTargeted){
+      menuItem -label $each -p "nameFileOM" -c "navigationProcRB" ($each+("MI"));
+      $i++;
+    }
+
+}
+
+global proc openAsset(string $pathFolder , string $typeAsset , string $name , string $version){
+
+
+    string $listFile[] = `getFileList -folder  ($pathFolder+$name+"/")`;
+    print $listFile;
+    print $pathFolder ;
+
+    for ($each in $listFile){
+      string $buffer[] = {};
+      int $nubToken = `tokenize $each "_" $buffer` ;
+
+      if($buffer[0]==$typeAsset){
+        file -force -open ($pathFolder+$name+"/"+$each);
+
+
+        /* string $targetCst[] = `ls "*cst"`;
+        string $sourceCst[] = `ls "*ctl"`;
+
+        scaleConstraint  $sourceCst[0] $targetCst[0];
+
+        file -rename ($pathFolder+$name+"/"+ $typeAsset +"_"+$name+"_ref") ; file -save -type "mayaAscii";
+        sysFile -del ($pathFolder+$name+"/"+ $typeAsset +"_"+$name+"_ref.mb");
+        sysFile -del ($pathFolder+$name+"/"+ "TX" +"_"+$name+"_ref.mb");
+        file -force -new;
+        file -reference -type "mayaAscii" -namespace "MD" ($pathFolder+$name+"/"+$each);
+        file -rename  ($pathFolder+$name+"/TX_"+$name+"_ref") ; file -save -type "mayaAscii"; */
+
+      }
+
+    }
+}
+
+/* string $tmpCfg = (`internalVar -utd`+"mobiUser.cfg");
+sysFile -delete $tmpCfg */
+mobiPipe;

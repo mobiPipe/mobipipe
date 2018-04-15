@@ -1,0 +1,86 @@
+
+global proc int writeFile(string $pathFile, string $text){
+
+    $fileId = `fopen $pathFile "w"`;
+    fwrite $fileId $text;
+    fclose $fileId;
+    return 1;
+}
+
+global proc string[] smartStripPath(string $pathFile){
+    string $buffer[];
+    string $dirPathBase="";
+    tokenize($pathFile,"/",$buffer);
+    for($i=0;$i<size($buffer)-1;$i++){
+        $dirPathBase+=($buffer[$i]+"/");
+    }
+    string $baseName = basename( $pathFile, ".mel" );
+    return {$baseName,$dirPathBase};
+}
+
+global proc int detectChangeInExtFile(string $pathFile){
+    string $linkFile = `freadAllText $pathFile`;
+    string $smartStripPath[] = `smartStripPath $pathFile `;
+    string $tmpFilePath = ( `internalVar -userTmpDir` +$smartStripPath[0]+".tmp" );
+    string $linkFileBuffer="";
+    if(`file -q -ex  $tmpFilePath`){
+         $linkFileBuffer = `freadAllText $tmpFilePath`;
+    }
+
+    if(size($linkFile)== size($linkFileBuffer)){
+        //print "same";
+        return 0;
+    }else{
+        //print "modified";
+        string $bufferFile = `writeFile $tmpFilePath $linkFile`;
+        return 1;
+    }
+
+}
+
+global proc linkToMelFile(string $pathFile){
+    eval("source \""+$pathFile+"\"");
+    string $nameProc = basenameEx($pathFile);
+    eval($nameProc);
+
+}
+
+
+global proc cmdButtonStartSync(){
+   $pathFile = `textField -q -tx SESMtargetTF` ;
+   $idProcess = `initSync $pathFile`;
+   window -e  -cc ("scriptJob -kill "+$idProcess[1]+" -force;condition -delete SavedInExtFile;") syncExtScriptFileUI;
+   button -e -c ("scriptJob -kill "+$idProcess[1]+" -force;condition -delete SavedInExtFile;textField -e -tx \"Link stopped\" infosProcessTF;") stopSyncBT;
+   textField -e -tx ("Link activated ... processId:"+$idProcess[1]) infosProcessTF;
+}
+//string $pathFile = "D:/2.PROJETS/2018/1-eartsup/eartsup/0-PROJET/scripts/test.mel";
+
+global proc string[] initSync(string  $pathFile){
+
+    string $conditionId = `condition -s ("detectChangeInExtFile \""+$pathFile+"\"") -d idle SavedInExtFile`;
+    string $loadedCmd = "linkToMelFile \""+$pathFile+"\"";
+    string $scriptJobId = `scriptJob -conditionTrue SavedInExtFile $loadedCmd` ;
+    return {$conditionId,$scriptJobId};
+
+}
+
+//condition -delete SavedInExtFile;
+//scriptJob -listJobs;
+//scriptJob -kill 132 -force;
+global proc syncExtScriptFile(){
+
+    global string $idProcess[];
+
+    if(`window -exists syncExtScriptFileUI`){
+        deleteUI syncExtScriptFileUI;
+    }
+
+    window -t "Sync Ext Script File" syncExtScriptFileUI;
+        columnLayout -adj 1 SESMmainCL;
+        textField -tx "Z:/4-MAYA/scripts/publish/mobiPipe.mel" SESMtargetTF;
+        button -l "start sync file" -c cmdButtonStartSync startSyncBT;
+        button -l "stop sync file" stopSyncBT;
+        textField -ed 0 -tx "ready to link ;) " infosProcessTF;
+    showWindow syncExtScriptFileUI;
+
+}

@@ -1,0 +1,87 @@
+global proc autoBuildRefScene(){
+
+
+  if(`window -exists autoBuildRefSceneWD`){
+    deleteUI autoBuildRefSceneWD;
+  }
+
+  window autoBuildRefSceneWD;
+    columnLayout ;
+    autoBuildRefSceneUI;
+  showWindow autoBuildRefSceneWD;
+
+}
+
+
+
+global proc autoBuildRefSceneUI() {
+
+  frameLayout -mw 10 -li 5 -cll 1 -l "Build Asset";
+     rowColumnLayout -nc 2 -adj 1;
+       textField nameAssetTF;
+       button -l "Create Controller" -c "autoBuildRefSceneProc `textField -q -tx nameAssetTF`";
+     setParent ..;
+     removeAllShadingNodesUI;
+  setParent ..;
+  setParent ..;
+
+}
+
+
+global proc  autoBuildRefSceneProc(string $masterName) {
+
+  frameLayout -mw 10 -li 5 -cll 1 -l "Build Asset";
+   rowColumnLayout -nc 2 -adj 1;
+     textField nameAssetTF;
+     button -l "Create Controller" -c "autoBuildRefSceneProc `textField -q -tx nameAssetTF`";
+     setParent ..;
+
+  addPrefixSuffixByTypeToDagObjects "mesh" "" "msh";
+  addPrefixSuffixByTypeToDagObjects "transform" "" "grp";
+
+  string $listMsh [] = `ls -sl`;
+  if(size($listMsh)==0){
+    error "No Object Selected";
+  }
+  string $listDAGs[] = `ls -dag -tr`;
+  string $noMshObj[] = `stringArrayRemove $listMsh  $listDAGs` ;
+
+
+  string $mshGrp = `group -em -n ($masterName+"_grp")`;
+  string $groupCst = `group -em -n ($masterName+"_cst")`;
+  string $groupModel = `group -em -n ( "MODEL_"+$masterName+"_grp")`;
+
+  string $rootGrp = `group -em -n ($masterName)`;
+
+  parent $mshGrp $groupCst ;
+  parent $groupCst $groupModel ;
+  parent $groupModel  $rootGrp;
+
+  for( $each in $listMsh ){
+    parent $each $mshGrp ;
+    }
+  float $bb[] = `xform -q -bb $mshGrp`;
+  vector $vectorMag = <<$bb[3],$bb[4],$bb[5]>> - <<$bb[0],$bb[1],$bb[2]>>;
+  vector $magVec = mag($vectorMag);
+  float $mag = $magVec.x;
+
+  string $circle[] = `circle -nry 1 -nrz 0 -r ($mag/2) -n ($masterName+"_ctl")`;
+  parentConstraint $circle[0] $groupCst;
+/* modif */
+  string $targetCst[] = `ls "*cst"`;
+  string $sourceCst[] = `ls "*ctl"`;
+
+  scaleConstraint  $sourceCst[0] $targetCst[0];
+  /* modif */
+
+
+/* for($objToDelete in  $noMshObj ){
+  if(`objExists $objToDelete` ){
+      delete $objToDelete ;
+  }
+} */
+
+string $rigGroup = `group -n ("RIG_"+$masterName+"_grp")`;
+parent $rigGroup $rootGrp ;
+
+}

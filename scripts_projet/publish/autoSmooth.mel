@@ -1,0 +1,50 @@
+//Script for Smooth Set Group
+
+global proc autoSmooth(){
+
+    if(`window -q -exists autoSmoothOnlyUI`){
+      deleteUI autoSmoothOnlyUI;
+    }
+
+    window -t "Smooth Before Render" autoSmoothOnlyUI;
+    autoSmoothUI;
+    showWindow autoSmoothOnlyUI;
+
+}
+
+global proc autoSmoothUI(){
+
+  frameLayout -mw 10 -li 5 -cll 1 -l "Smooth Before Render";
+    columnLayout -adj 1 smoothCL ;
+      button -label "active Premel Smooth" -c "autoSmoothProc";
+    setParent .. ;
+  setParent .. ;
+
+}
+
+global proc autoSmoothProc(){
+
+string $listSmooth[] = `ls -set "smooth*"`;
+
+for($i=0;$i<size($listSmooth);$i++){
+
+    string $listShapes[] = `listRelatives $listSmooth[$i]`;
+    string $buffer[];
+
+    $essaieTokenize = `tokenize $listSmooth[$i] "_" $buffer`;
+    int $premierSmooth = $buffer[1];
+
+    for($b=0;$b<size($listShapes);$b++){
+        string $inConnection[] = `listConnections -t "polySmoothFace" $listShapes[$b]`;
+        if(size($inConnection) != 0) {
+
+          setAttr ($inConnection[0]+".divisions") $premierSmooth;
+          }else{
+              polySmooth -dv $premierSmooth $listShapes[$b];
+        }
+
+    }
+
+}
+
+}

@@ -1,0 +1,71 @@
+
+global proc createCustomSet(){
+
+  if(`window -q -exists createCustomSetOnlyUI`){
+    deleteUI createCustomSetOnlyUI;
+  }
+
+  window -t" create Custom Set " createCustomSetOnlyUI;
+  createCustomSetUI;
+  showWindow createCustomSetOnlyUI;
+}
+
+
+global proc createCustomSetUI(){
+
+    frameLayout -mw 10 -li 5 -cll 1 -l "Create Custom Set";
+      columnLayout -adj 1 createCustomSetCL ;
+        rowLayout -nc 2 -adj 1 ;
+            textField -w 100 nameSetTF;
+            optionMenu -changeCommand "print #1" suffixSetOM ;
+                menuItem -label "shd";
+                menuItem -label "lgt";
+        setParent .. ;
+        button -l "Create Set" -c "createCustomSetProc `textField -q -tx nameSetTF` `optionMenu -q -v suffixSetOM`" createSetBT;
+    setParent .. ;
+
+}
+
+global proc createCustomSetProc(string $nameSet , string $suffix ){
+    string $sel[] = `ls -sl`;
+
+
+
+
+// isole les sets existant
+
+    string $defaultsNodes[] = `ls -dn`;
+    string $listAllSets[] =   `ls -set`;
+    string $listSetsCustoms[] = stringArrayRemoveExact($defaultsNodes, $listAllSets);
+
+    for ($i = 0 ; $i<size($listSetsCustoms);$i++){
+      string $buffer[] ;
+      $numToken = `tokenize $listSetsCustoms[$i] "_" $buffer`;
+      if(size($buffer)>1){
+        $listSetsCustoms[$i] = $buffer[0];
+      }
+    }
+
+
+//  donne une liste qui contient les sets identique au nom de set demandé par l'utilisateur
+
+    string $myIntersector = `stringArrayIntersector`;
+    stringArrayIntersector -edit -intersect $listSetsCustoms $myIntersector;
+    stringArrayIntersector -edit -intersect { ($nameSet+"_"+ $suffix) } $myIntersector;
+    string $existingSet[] = `stringArrayIntersector -query $myIntersector`;
+
+// si le set n'existe pas , ça le créé
+
+    if(size($existingSet) == 0 ){
+        $nameSet = ` sets -n ($nameSet+"_"+ $suffix)`;
+    }
+
+// parent les elements de la selection au set
+
+    for($eachObj in $sel){
+
+        sets -edit -forceElement  ($nameSet+"_"+ $suffix) $eachObj ;
+
+    }
+
+}

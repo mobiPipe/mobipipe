@@ -1,0 +1,199 @@
+
+/*
+exemples d'utilisations :
+addPrefixSuffixByTypeToDagObjects "mesh" "R" "msh";
+addPrefixSuffixByTypeToDagObjects "transform" "" "grp";
+addPrefixSuffixByTypeToDagObjects "nurbsCurve" "L" "ctl" ;
+*/
+
+global proc renameToolKit(){
+
+  string $presetsPrefixLib[] = {"MODEL","RIG","R","L","C"};
+  string $presetsSuffixLib[] = {"msh","grp","ctl","loc"};
+  string $presetsSuffixLibTypes[] = {"mesh","transform","nurbsCurve","locator"};
+
+  if(`window -exists RL_renamerUI`){
+    deleteUI RL_renamerUI;
+  }
+  window -t "renamerTool" -rtf 1 -w 200 -s 0  RL_renamerUI ;
+    columnLayout -w 300 -adj 1 mainCL ;
+    renamerToolKitUI;
+  showWindow RL_renamerUI ;
+}
+
+global proc renamerToolKitUI(){
+  frameLayout -mw 10  -li 5 -cll 1 -l "Rename Tools";
+  string $presetsPrefixLib[] = {"MODEL","RIG","R","L","C"};
+  string $presetsSuffixLib[] = {"msh","grp","ctl","loc"};
+  string $presetsSuffixLibTypes[] = {"mesh","transform","nurbsCurve","locator"};
+
+       radioCollection listModeRC;
+       frameLayout  -li 20 -cll 1 -l "Add suffix";
+           rowColumnLayout -nc 2 ;
+               radioButton -sl -label "autoDetect Type" -cl "listModeRC" byTypeRB;
+               radioButton -label "by Selection" -cl "listModeRC" bySelRB;
+           setParent ..;
+           rowColumnLayout -nc 4 ;
+               $i=0;
+               for($each in $presetsSuffixLib){
+                   button -w 74 -l $each -ann $presetsSuffixLibTypes[$i] -c ("suffixButtonsProc(`button -q -l "+$each+"BT\`,`button -q -ann "+$each+"BT\`)") ($each+"BT");
+                   $i++;
+               }
+           setParent ..;
+           button -l "Add suffix to everything by Type" -c "loadAllSuffix";
+          button -w 300 -l "remove suffix" -c "removeSuffix `ls -sl`";
+
+         setParent ..;
+         separator -style "none";
+
+   frameLayout -cll 1 -l "Custom rename By Selections";
+
+         text -l "" -align "left";
+             rowLayout -w 300 -nc 4 testRL;
+                 optionMenu -w 50 -changeCommand "if(`optionMenu -q -sl prefixOM`!=1){print #1;}" prefixOM;
+                       menuItem -label "";
+                       for($each in  $presetsPrefixLib){
+                           menuItem -label $each ($each+"MI");
+                       }
+
+         textField -w 140 newNameTF;
+
+         optionMenu -changeCommand "if(`optionMenu -q -sl suffixOM`!=1){print #1;}" suffixOM ;
+              menuItem -l "auto" blankMI;
+                 for($each in $presetsSuffixLib){
+                       menuItem -l $each ($each+"MI");
+                   }
+                   button -l "rename" -h 17 -c "customRenameListProc `ls -sl` `optionMenu -q -v  prefixOM` `textField -q -tx newNameTF` `optionMenu -q -v suffixOM`";
+               setParent ..;
+         setParent ..;
+     setParent ..;
+}
+
+
+
+global proc loadAllSuffix(){
+    addPrefixSuffixByTypeToDagObjects "mesh" "" "msh";
+    addPrefixSuffixByTypeToDagObjects "transform" "" "grp";
+    addPrefixSuffixByTypeToDagObjects "nurbsCurve" "" "ctl";
+    addPrefixSuffixByTypeToDagObjects "locator" "" "loc";
+}
+
+global proc suffixButtonsProc(string $labelButton , string $objectType ){
+
+    string $detectMod = `radioCollection -q -sl listModeRC`;
+
+    switch($detectMod){
+
+        case "bySelRB" :
+                            string $sel[] = `ls -sl`;
+                            addPrefixSuffixToArray "" $labelButton $sel;
+                            break;
+        case "byTypeRB" :
+
+                            addPrefixSuffixByTypeToDagObjects $objectType "" $labelButton ;
+                            break;
+        default :
+                    print "wtf ? are you kidding me ?";
+    };
+}
+
+global proc customRenameListProc(string $array[] , string $prefix , string $newName , string $suffix) {
+
+    string $padding ="";
+    string $newNameList[] = {};
+
+    $i=0;
+    for($each in $array){
+        if(size($array)>1){$padding = `zeroPadding $i 3`;}
+        $newNameList[$i] = `rename $each ($newName+$padding)` ;
+        $i++;
+    }
+    if($suffix!= "auto"){
+        addPrefixSuffixToArray $prefix $suffix $newNameList;
+    }else{
+            addPrefixSuffixByTypeToDagObjects "transform" $prefix "grp";
+            addPrefixSuffixByTypeToDagObjects "mesh" $prefix "msh";
+            addPrefixSuffixByTypeToDagObjects "nurbsCurve" $prefix "ctl";
+            addPrefixSuffixByTypeToDagObjects "locator" $prefix "loc";
+    }
+}
+
+global proc string removeSuffix(string $array[]){
+
+      string $resultString = "";
+      for($each in $array){
+          $resultString = "";
+          string $buffer[] = {};
+          $nbTokenize = tokenize($each,"_",$buffer);
+          for($i=0;$i<(size($buffer)-1);$i++){
+              $resultString += $buffer[$i];
+              if($i<(size($buffer)-2)){
+                  $resultString += "_";
+              }
+          }
+          if(size($buffer)!=1){
+          rename $each $resultString ;
+          }
+      }
+
+      return $resultString ;
+}
+
+
+global proc string zeroPadding(int $num, int $padding){
+
+  int $lengthNum=size(string($num));
+  string $padString;
+
+  if($lengthNum<$padding){
+    for($i=0;$i<($padding-$lengthNum);$i++){
+      $padString=$padString+"0";
+    }
+  }
+  return $padString+string($num);
+}
+
+
+
+global proc string[] listDagObjectByType(string $objectType){
+
+    string $listToRename[] = {};
+    string $listType[] = `ls -et $objectType`;
+    string $parentType[] = `listRelatives -p $listType`;
+    string $listCamera[] = `ls -ca`;
+    string $parentCamera[] = `listRelatives -p $listCamera`;
+
+    string $listTransform[] = `ls -tr`;
+
+    if ($objectType == "transform"){
+        $listType = `ls -ext "transform"`;
+        $parentType = `listRelatives -p$listType`;
+        $parentType = `stringArrayRemove $parentType $listTransform`;
+        $parentType = `stringArrayRemove $parentCamera $parentType`;
+
+    }
+
+    return $parentType;
+
+}
+
+global proc string[] addPrefixSuffixToArray (string $prefix , string $suffix,string $arrayToRename[] ){
+  string $result[] = {} ;
+    int $i=0;
+    for($each in $arrayToRename){
+      string $buffer[] = {};
+      $nbTokenize = tokenize($each,"_",$buffer);
+      if ($buffer[size($buffer)-1]!=$suffix){$each = `rename $each ($each+"_"+$suffix)`;}
+      if ($buffer[0]!=$prefix && $prefix != "" ){$each = `rename $each ($prefix+"_"+$each)`;}
+      $result[$i] = $each;
+      $i++;
+    }
+    return $result;
+}
+
+global proc addPrefixSuffixByTypeToDagObjects(string $objectType , string $prefix , string $suffix ){
+  string $listToRename[] =`listDagObjectByType $objectType`;
+  addPrefixSuffixToArray  $prefix $suffix $listToRename ;
+}
+
+//$fullPathScenes = (`workspace -q -rd` +`workspace -q -fre "scene"`)
